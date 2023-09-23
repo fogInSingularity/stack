@@ -3,13 +3,12 @@
 
 #include <stddef.h>
 
-
 typedef int Elem_t;
 
 struct Stack {
     Elem_t* data;
-    size_t size;
-    size_t capasity;
+    ssize_t size;
+    ssize_t capasity;
 };
 
 
@@ -17,19 +16,35 @@ typedef size_t StackError;
 
 enum StackState {
     Succes       = 0,
-    ErrorCtor    = 1 << 0,
-    ErrorDtor    = 1 << 1,
-    ErrorRealloc = 1 << 2,
-    ErrorPopNoEl = 1 << 3,
+    ErrorNotOk   = 1 << 0,
+    ErrorCtor    = 1 << 1,
+    ErrorDtor    = 1 << 2,
+    ErrorRealloc = 1 << 3,
+    ErrorPopNoEl = 1 << 4,
 };
 
+#define STACKDUMP(stk) StackDump(stk, __FILE__, __LINE__)
+
+#ifdef DEBUG
+    #define STACKASRT(stk) \
+        if (StackOk(stk) & StackState::ErrorNotOk) { \
+            STACKDUMP(stk); \
+            abort(); \
+        }
+#else
+    #define STACKASRT(stk) ;
+#endif
 
 StackError StackCtor(Stack* stk);
 
 StackError StackDtor(Stack* stk);
 
+StackError StackOk(Stack* stk);
+
 StackError StackPush(Stack* stk, Elem_t value);
 
 StackError StackPop(Stack* stk, Elem_t* retValue);
+
+StackError StackDump(Stack* stk, const char* file, size_t line);
 
 #endif
