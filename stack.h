@@ -2,13 +2,19 @@
 #define STACK_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 typedef int Elem_t;
+typedef uint64_t Canary_t;
 
 struct Stack {
+    Canary_t lcanary;
+
     Elem_t* data;
     ssize_t size;
     ssize_t capasity;
+
+    Canary_t rcanary;
 };
 
 
