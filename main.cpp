@@ -11,15 +11,15 @@ int main() {
         StackPush(&stack, (int)i);
     }
 
-    STACKDUMP(&stack);
-    
-    Elem_t tmp = 0;
+    STACK_DUMP(&stack);
+
+    elem_t tmp = 0;
 
     for (ssize_t i = 0; i < 16; i++) {
         StackPop(&stack, &tmp);
     }
 
-    STACKDUMP(&stack);
+    STACK_DUMP(&stack);
 
     StackDtor(&stack);
 

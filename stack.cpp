@@ -1,51 +1,63 @@
-#include <stdlib.h>
-#include <stddef.h>
-#include <ctype.h>
-#include <stdint.h>
-#include <assert.h>
-#include <malloc.h>
-#include <memory.h>
-
 #include "stack.h"
 
-#define $         fprintf(stderr, ">>> %s (%d)\n",__FILE__, __LINE__);
-#define $$(...) { fprintf(stderr, ">>> %s\n", #__VA_ARGS__); __VA_ARGS__; }
+//NOTE - StackOk
+//NOTE - fill vect
+//NOTE - hash
 
-static const size_t StandardAllocSize = 8;
 static const ssize_t MultiplyConst = 2;
 static const uint8_t Nullifier = 0;
-static const Canary_t Canary = 0xDEADDEAD;
+
+#ifdef CANARY_PROT
+static const canary_t Canary = 0xDEADFA11;
+#endif // CANARY_PROT
 
 //---------------------------------------------------------
 
 static StackError StackRecalloc(Stack* stk);
 
+#ifdef CANARY_PROT
+static inline canary_t* AdrLCanary(Stack* stk);
+static inline canary_t* AdrRCanary(Stack* stk);
+#endif // CANARY_PROT
+
+static inline elem_t* AdrDataElem(Stack* stk, ssize_t index);
+
 //---------------------------------------------------------
 
-StackError StackCtor(Stack* stk) {
-    assert(stk != nullptr);
+StackError StackCtor(Stack* stk, ssize_t initCap) {
+    ASSERT(stk != nullptr);
 
     StackError error = 0;
 
+    #ifdef CANARY_PROT
     stk->lcanary = Canary;
     stk->rcanary = Canary;
+    #endif // CANARY_PROT
 
     stk->size = 0;
-    stk->capasity = StandardAllocSize;
+    stk->capacity = (initCap < StandardAllocSize) ? StandardAllocSize : initCap;
 
-    stk->data = (Elem_t*)calloc(sizeof(Elem_t)*StandardAllocSize + 2*(sizeof(Canary_t)), sizeof(char));
-    *(Canary_t*)stk->data = Canary;
-    *(Canary_t*)((char*)stk->data + (size_t)stk->capasity*sizeof(Elem_t) + sizeof(Canary_t)) = Canary;
+    #ifdef CANARY_PROT
+    stk->data = (elem_t*)calloc(sizeof(elem_t)*(size_t)stk->capacity + 2*(sizeof(canary_t)), sizeof(char));
+    #else
+    stk->data = (elem_t*)calloc(sizeof(elem_t)*(size_t)stk->capacity, sizeof(char));
+    #endif // CANARY_PROT
 
     if (stk->data == nullptr) {
         error |= StackState::ErrorCtor;
+        return error;
     }
+
+    #ifdef CANARY_PROT
+    memcpy(AdrLCanary(stk), &Canary, sizeof(canary_t)); // bytes misalligment fix
+    memcpy(AdrRCanary(stk), &Canary, sizeof(canary_t));
+    #endif // CANARY_PROT
 
     return error;
 }
 
 StackError StackDtor(Stack* stk) {
-    assert(stk != nullptr);
+    ASSERT(stk != nullptr);
 
     StackError error = 0;
 
@@ -53,119 +65,103 @@ StackError StackDtor(Stack* stk) {
     stk->data = nullptr;
 
     stk->size = 0;
-    stk->capasity = 0;
+    stk->capacity = 0;
 
     return error;
 }
 
-StackError StackOk(Stack* stk) {
+StackError StackOk(Stack* stk) { //FIXME - shhiiiit
     StackError error = 0;
 
-    if (stk == nullptr) {
-        error |= StackState::ErrorNotOk;
-        // printf("1");
-    } else {
-        if (stk->lcanary != Canary) {
-            error |= StackState::ErrorNotOk;
-            // printf("2");
-        } else if (stk->rcanary != Canary) {
-            error |= StackState::ErrorNotOk;
-            // printf("3");
-        } else if (stk->data == nullptr) {
-            error |= StackState::ErrorNotOk;
-            // printf("4");
-        } else {
-            if (stk->capasity < 0 || stk->size < 0) {
-                error |= StackState::ErrorNotOk;
-                // printf("5");
-            } else if (stk->capasity < stk->size) {
-                error |= StackState::ErrorNotOk;
-                // printf("6");
-            } else {
-                for (size_t i = (size_t)stk->size; i < (size_t)stk->capasity; i++) {
-                    // printf("%lu\n", i);
-                    if (*(Elem_t*)((char*)stk->data + sizeof(Canary_t) + sizeof(Elem_t)*i) != Nullifier) {
-                        error |= StackState::ErrorNotOk;
-                        // printf("data:   %p\n", stk->data);
-                        // printf("canary: %p\n", (char*)stk->data + sizeof(Canary_t));
-                        // printf("error:  %p\n", (char*)stk->data + sizeof(Canary_t) + sizeof(Elem_t)*i);
-                        // printf("7\n");
-                        break;
-                    }
-                }
-            }
+    (void)stk;
+
+    return error;
+}
+
+StackError StackPush(Stack* stk, elem_t value) {
+    STACK_ASSERT(stk);
+
+    StackError error = 0;
+
+    if (stk->capacity <= stk->size) {
+        stk->capacity *= MultiplyConst;
+        error |= StackRecalloc(stk);
+
+        if (error & StackState::ErrorRecalloc) {
+            return error;
         }
     }
 
+    *(AdrDataElem(stk, stk->size++)) = value;
 
+    STACK_ASSERT(stk);
     return error;
 }
 
-StackError StackPush(Stack* stk, Elem_t value) {
-    STACKASRT(stk);
-
-    StackError error = 0;
-
-    if (stk->capasity <= stk->size) {
-        stk->capasity *= MultiplyConst;
-        error |= StackRecalloc(stk);
-    }
-
-    $$(*(Elem_t*)((char*)stk->data + sizeof(Canary_t) + sizeof(Elem_t)*(size_t)(stk->size++)) = value;)
-
-    STACKASRT(stk);
-    return error;
-}
-
-StackError StackPop(Stack* stk, Elem_t* retValue) {
-    STACKASRT(stk);
+StackError StackPop(Stack* stk, elem_t* retValue) {
+    STACK_ASSERT(stk);
 
     StackError error = 0;
 
     if (stk->size <= 0) {
         error |= StackState::ErrorPopNoEl;
+        return error;
     } else {
-        *retValue = *(Elem_t*)((char*)stk->data + sizeof(Canary_t) + sizeof(Elem_t)*(size_t)(--stk->size));
-        *((char*)stk->data + sizeof(Canary_t) + sizeof(Elem_t)*(size_t)(stk->size)) = 0;
+        *retValue = *AdrDataElem(stk, --stk->size);
+        *AdrDataElem(stk, stk->size) = Nullifier;
     }
 
-    if (stk->size * MultiplyConst * MultiplyConst <= stk->capasity) {
-        stk->capasity /= MultiplyConst;
+    if (stk->size * MultiplyConst * MultiplyConst <= stk->capacity) {
+        stk->capacity /= MultiplyConst;
 
         error |= StackRecalloc(stk);
+        if (error & StackState::ErrorRecalloc) {
+            return error;
+        }
     }
 
-    STACKASRT(stk);
+    STACK_ASSERT(stk);
     return error;
 }
 
-StackError StackDump(Stack* stk, const char* file, size_t line) {
+StackError StackDump(Stack* stk, const char* file, size_t line, const char* func) {
+    ASSERT(stk != nullptr);
+
     StackError error = 0;
 
     printf("\n");
-    printf("#  Stack[ %p ] called from %s(%lu)\n", stk, file, line);
+    printf("#  Stack[ %p ] called from file %s(%lu) from function %s\n", stk, file, line, func);
     printf("#  {\n");
 
+    #ifdef CANARY_PROT
     printf("#    lcanary 0x%lX\n", stk->lcanary);
+    #endif // CANARY_PROT
     printf("#    size %ld\n", stk->size);
-    printf("#    capasity %ld\n", stk->capasity);
+    printf("#    capacity %ld\n", stk->capacity);
 
     printf("#    data[ %p ]\n", stk->data);
     printf("#    {\n");
 
-        printf("#      lcanary 0x%lX\n", *(Canary_t*)stk->data);
+        #ifdef CANARY_PROT
+        printf("#      lcanary 0x%lX\n", *(canary_t*)stk->data);
+        #endif // CANARY_PROT
     for (ssize_t i = 0; i < stk->size; i++) {
-        printf("#     *[%ld] %d\n", i, *(Elem_t*)((char*)stk->data + sizeof(Canary_t) + (size_t)i*sizeof(Elem_t)));
+        printf("#     *[%ld] %d\n", i, *AdrDataElem(stk, i));
     }
 
-    for (ssize_t i = stk->size; i < stk->capasity; i++) {
-        printf("#      [%ld] %d\n", i, *(Elem_t*)((char*)stk->data + sizeof(Canary_t) + (size_t)i*sizeof(Elem_t)));
+    for (ssize_t i = stk->size; i < stk->capacity; i++) {
+        printf("#      [%ld] %d\n", i, *AdrDataElem(stk, i));
     }
-        printf("#      rcanary 0x%lX\n", *(Canary_t*)((char*)stk->data + sizeof(Elem_t)*(size_t)stk->capasity));
+        #ifdef CANARY_PROT
+        printf("#      rcanary 0x%lX\n", *AdrRCanary(stk));
+        #endif // CANARY_PROT
 
     printf("#    }\n");
 
+    #ifdef CANARY_PROT
     printf("#    rcanary 0x%lX\n", stk->rcanary);
+    #endif // CANARY_PROT
+
     printf("#  }\n");
     printf("\n");
 
@@ -177,19 +173,44 @@ StackError StackDump(Stack* stk, const char* file, size_t line) {
 static StackError StackRecalloc(Stack* stk) {
     StackError error = 0;
 
-    Elem_t* holdPtr = stk->data;
-    stk->data = (Elem_t*)realloc(stk->data,2*sizeof(Canary_t) + (size_t)stk->capasity*sizeof(Elem_t));
+    elem_t* holdPtr = stk->data;
+    #ifdef CANARY_PROT
+    stk->data = (elem_t*)realloc(stk->data, 2*sizeof(canary_t) + (size_t)stk->capacity*sizeof(elem_t));
+    #else
+    stk->data = (elem_t*)realloc(stk->data, (size_t)stk->capacity*sizeof(elem_t));
+    #endif // CANARY_PROT
 
     if (stk->data == nullptr) {
         stk->data = holdPtr;
 
-        error |= StackState::ErrorRealloc;
+        error |= StackState::ErrorRecalloc;
     } else {
-        memset((char*)stk->data + (size_t)stk->size*sizeof(Elem_t) + sizeof(Canary_t), Nullifier, (size_t)(stk->capasity - stk->size)*sizeof(Elem_t));
+        memset(AdrDataElem(stk, stk->size), Nullifier, (size_t)(stk->capacity - stk->size)*sizeof(elem_t));
+        #ifdef CANARY_PROT
+        memcpy(AdrRCanary(stk), &Canary, sizeof(canary_t));
+        #endif // CANARY_PROT
     }
 
     holdPtr = nullptr;
 
-    STACKASRT(stk);
+    STACK_ASSERT(stk);
     return error;
+}
+
+#ifdef CANARY_PROT
+static inline canary_t* AdrLCanary(Stack* stk) {
+    return (canary_t*)stk->data;
+}
+
+static inline canary_t* AdrRCanary(Stack* stk) {
+    return (canary_t*)((char*)stk->data + (size_t)stk->capacity*sizeof(elem_t) + sizeof(canary_t));
+}
+#endif // CANARY_PROT
+
+static inline elem_t* AdrDataElem(Stack* stk, ssize_t index) {
+    #ifdef CANARY_PROT
+    return (elem_t*)((char*)stk->data + sizeof(canary_t) + (size_t)index*sizeof(elem_t));
+    #else
+    return (elem_t*)((char*)stk->data + (size_t)index*sizeof(elem_t));
+    #endif // CANARY_PROT
 }
