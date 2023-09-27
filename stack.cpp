@@ -58,11 +58,7 @@ StackError StackCtor(Stack* stk, ssize_t initCap) {
     stk->stackHash = 0;
     stk->dataHash = 0;
 
-    #ifdef _CANARY_PROT
-    holdHash = Hash((const uint8_t*)stk->data, sizeof(elem_t)*(size_t)stk->capacity + 2*sizeof(canary_t), 0);
-    #else
     holdHash = Hash((const uint8_t*)stk->data, sizeof(elem_t)*(size_t)stk->capacity, 0);
-    #endif // _CANARY_PROT
     stk->dataHash = holdHash;
 
     holdHash = Hash((const uint8_t*)stk, sizeof(Stack), 0);
@@ -80,7 +76,6 @@ StackError StackDtor(Stack* stk) {
     StackError error = 0;
 
     free(stk->data);
-    stk->data = nullptr;
 
     #ifdef _HASH_PROT
     stk->stackHash = 0;
@@ -167,11 +162,7 @@ StackError StackPush(Stack* stk, elem_t value) {
     stk->stackHash = 0;
     stk->dataHash = 0;
 
-    #ifdef _CANARY_PROT
-    holdHash = Hash((const uint8_t*)stk->data, sizeof(elem_t)*(size_t)stk->capacity + 2*sizeof(canary_t), 0);
-    #else
     holdHash = Hash((const uint8_t*)stk->data, sizeof(elem_t)*(size_t)stk->capacity, 0);
-    #endif // _CANARY_PROT
     stk->dataHash = holdHash;
 
     holdHash = Hash((const uint8_t*)stk, sizeof(Stack), 0);
@@ -210,11 +201,7 @@ StackError StackPop(Stack* stk, elem_t* retValue) {
     stk->stackHash = 0;
     stk->dataHash = 0;
 
-    #ifdef _CANARY_PROT
-    holdHash = Hash((const uint8_t*)stk->data, sizeof(elem_t)*(size_t)stk->capacity + 2*sizeof(canary_t), 0);
-    #else
     holdHash = Hash((const uint8_t*)stk->data, sizeof(elem_t)*(size_t)stk->capacity, 0);
-    #endif // _CANARY_PROT
     stk->dataHash = holdHash;
 
     holdHash = Hash((const uint8_t*)stk, sizeof(Stack), 0);
@@ -320,11 +307,8 @@ static StackError StackOkData(Stack* stk) {
     #ifdef _HASH_PROT
     uint32_t hashOkdata = 0;
 
-    #ifdef _CANARY_PROT
-    hashOkdata = Hash((const uint8_t*)stk->data, 2*sizeof(canary_t) + (size_t)stk->capacity*sizeof(elem_t), 0);
-    #else
     hashOkdata = Hash((const uint8_t*)stk->data, (size_t)stk->capacity*sizeof(elem_t), 0);
-    #endif // _CANARY_PROT
+
     if (hashOkdata != stk->dataHash) {
         error |= StackState::ErrorDataHash;
         return error;

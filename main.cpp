@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "hash.h"
 
+// stack code exemple
 int main() {
     Stack stack = {};
     StackCtor(&stack);
@@ -24,8 +25,6 @@ int main() {
     STACK_DUMP(&stack, 0);
 
     StackDtor(&stack);
-
-    stack.data[0] = 1;
 
     return 0;
 }
