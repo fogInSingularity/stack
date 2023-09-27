@@ -11,9 +11,7 @@ static const canary_t Canary = 0xDEADFA11;
 
 static StackError StackRecalloc(Stack* stk);
 
-#ifdef _HASH_PROT
 static StackError StackOkData(Stack* stk);
-#endif // _HASH_PROT
 
 #ifdef _CANARY_PROT
 static inline canary_t* AdrLCanary(Stack* stk);
@@ -95,7 +93,7 @@ StackError StackDtor(Stack* stk) {
     return error;
 }
 
-StackError StackOk(Stack* stk) { //FIXME - shhiiiit
+StackError StackOk(Stack* stk) {
     StackError error = 0;
 
     if (stk == nullptr) {
@@ -123,11 +121,10 @@ StackError StackOk(Stack* stk) { //FIXME - shhiiiit
         }
 
         #ifdef _HASH_PROT
-// printf("stk hash %u\n", stk->stackHash);
         uint32_t holdHash = stk->stackHash;
         stk->stackHash = 0;
+
         uint32_t hashOk = Hash((const uint8_t*)stk, sizeof(Stack), 0);
-// printf("hash ok %u\n", hashOk);
         stk->stackHash = holdHash;
         if (stk->stackHash != hashOk) {
             error |= StackState::ErrorStkHash;
@@ -313,7 +310,8 @@ static StackError StackOkData(Stack* stk) {
     if (*AdrLCanary(stk) != Canary) {
         error |= StackState::ErrorDataLCanary;
         return error;
-    } else if (*AdrRCanary(stk) != Canary) {
+    // } else if (*AdrRCanary(stk) != Canary) {
+    } else if (memcmp(AdrRCanary(stk), &Canary, sizeof(canary_t))) {
         error |= StackState::ErrorDataRCanary;
         return error;
     }

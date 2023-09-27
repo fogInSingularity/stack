@@ -25,5 +25,7 @@ int main() {
 
     StackDtor(&stack);
 
+    stack.data[0] = 1;
+
     return 0;
 }
