@@ -5,7 +5,8 @@ SOURCES = $(wildcard *.cpp)
 OBJECTS = $(foreach src,$(SOURCES),./$(BUILD_DIR)/$(src:.cpp=.o))
 DEPS = $(wildcard $(BUILD_DIR)/*.d)
 OPT_LEVEL = -O0
-DEFINES = DEBUG,CANARY_PROT
+DEFINES = -D_DEBUG -D_CANARY_PROT -D_HASH_PROT
+# DEFINES = -D_NOTHING
 FLAGS = -MMD -MP -std=c++17 -Wall -Wextra -Weffc++ -Waggressive-loop-optimizations \
 -Wc++14-compat -Wmissing-declarations -Wcast-align -Wcast-qual \
 -Wchar-subscripts -Wconditionally-supported -Wconversion -Wctor-dtor-privacy \
@@ -32,7 +33,7 @@ $(EXE): $(OBJECTS)
 	@$(CC) $(OBJECTS) $(FLAGS) -D $(DEFINES) -o $(EXE)
 
 $(BUILD_DIR)/%.o: %.cpp
-	@$(CC) $^ -c $(OPT_LEVEL) $(FLAGS) -D $(DEFINES) -o $@
+	@$(CC) $^ -c $(OPT_LEVEL) $(FLAGS) $(DEFINES) -o $@
 
 clean:
 	@rm $(BUILD_DIR)/*
@@ -44,7 +45,7 @@ release:
 	@g++ $(wildcard *.cpp) -o $(EXE) -O3
 
 noasan:
-	@g++ $(wildcard *.cpp) -o $(EXE) -Og -D DEBUG
+	@g++ $(wildcard *.cpp) -o $(EXE) -Og -D _DEBUG
 
 # -include $(DEPS)
 

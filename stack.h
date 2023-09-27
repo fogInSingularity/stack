@@ -9,69 +9,72 @@
 #include <malloc.h>
 #include <memory.h>
 
-// #define DEBUG
-// #define CANARY_PROT
+#include "utils.h"
+#include "hash.h"
 
 typedef int elem_t;
 const ssize_t StandardAllocSize = 8;
 
-#ifdef CANARY_PROT
+#ifdef _CANARY_PROT
 typedef uint64_t canary_t;
-#endif // CANARY_PROT
+#endif // _CANARY_PROT
 
 struct Stack {
-    #ifdef CANARY_PROT
+    #ifdef _CANARY_PROT
     canary_t lcanary;
-    #endif // CANARY_PROT
+    #endif // _CANARY_PROT
 
     elem_t* data;
     ssize_t size;
     ssize_t capacity;
 
-    #ifdef CANARY_PROT
+    #ifdef _HASH_PROT
+    uint32_t stackHash;
+    uint32_t dataHash;
+    #endif
+
+    #ifdef _CANARY_PROT
     canary_t rcanary;
-    #endif // CANARY_PROT
+    #endif // _CANARY_PROT
 };
 
 
 typedef size_t StackError;
 
+// 0b1000000000
 enum StackState {
-    Success       = 0,
-    ErrorNotOk    = 1 << 0,
-    ErrorCtor     = 1 << 1,
-    ErrorDtor     = 1 << 2,
-    ErrorRecalloc = 1 << 3,
-    ErrorPopNoEl  = 1 << 4,
+    Success          = 0,
+    ErrorCtor        = 1 << 0,
+    ErrorDtor        = 1 << 1,
+    ErrorRecalloc    = 1 << 2,
+    ErrorPopNoEl     = 1 << 3,
+    //---StackOkErrors---
+    ErrorStkNull     = 1 << 4,
+    ErrorStkLCanary  = 1 << 5,
+    ErrorStkRCanary  = 1 << 6,
+    ErrorStkSizeNeg  = 1 << 7,
+    ErrorStkCapNeg   = 1 << 8,
+    ErrorStkHash     = 1 << 9,
+    ErrorDataNull    = 1 << 10,
+    ErrorDataLCanary = 1 << 11,
+    ErrorDataRCanary = 1 << 12,
+    ErrorDataHash    = 1 << 13,
 };
 
 
-#define STACK_DUMP(stk) StackDump(stk, __FILE__, __LINE__, __func__)
+#define STACK_DUMP(stk, error) StackDump(stk, error, __FILE__, __LINE__, __func__);
 
-#ifdef DEBUG
-    #define $        fprintf(stderr, ">>> %s (%d) %s\n",__FILE__, __LINE__, __func__);
-    #define $$(...) {fprintf(stderr, ">>> %s\n", #__VA_ARGS__); __VA_ARGS__;}
-
+#ifdef _DEBUG
     #define STACK_ASSERT(stk) \
-        if (StackOk(stk) & StackState::ErrorNotOk) { \
-            STACK_DUMP(stk); \
+    do { \
+        StackError AssertHoldErr = StackOk(stk); \
+        if (AssertHoldErr != StackState::Success) { \
+            STACK_DUMP(stk, AssertHoldErr); \
             abort(); \
-        }
-
-    #define  ASSERT(expr) \
-        if ((expr) == 0) { \
-            printf("# ERROR:\n"); \
-            printf("#   file: %s\n", __FILE__); \
-            printf("#   line: %d\n", __LINE__); \
-            printf("#   func: %s\n", __func__); \
-            abort(); \
-        }
+        } \
+    } while (0);
 #else
-    #define $ ;
-    #define $$(...) ;
-
     #define STACK_ASSERT(stk) ;
-    #define ASSERT(expr) ;
 #endif
 
 StackError StackCtor(Stack* stk, ssize_t initCap = StandardAllocSize);
@@ -84,6 +87,6 @@ StackError StackPush(Stack* stk, elem_t value);
 
 StackError StackPop(Stack* stk, elem_t* retValue);
 
-StackError StackDump(Stack* stk, const char* file, size_t line, const char* func);
+void StackDump(Stack* stk, StackError error, const char* file, size_t line, const char* func);
 
 #endif // STACK_H

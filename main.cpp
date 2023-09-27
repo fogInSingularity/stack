@@ -2,6 +2,8 @@
 #include <stdlib.h>
 
 #include "stack.h"
+#include "utils.h"
+#include "hash.h"
 
 int main() {
     Stack stack = {};
@@ -11,7 +13,7 @@ int main() {
         StackPush(&stack, (int)i);
     }
 
-    STACK_DUMP(&stack);
+    STACK_DUMP(&stack, 0);
 
     elem_t tmp = 0;
 
@@ -19,7 +21,7 @@ int main() {
         StackPop(&stack, &tmp);
     }
 
-    STACK_DUMP(&stack);
+    STACK_DUMP(&stack, 0);
 
     StackDtor(&stack);
 
